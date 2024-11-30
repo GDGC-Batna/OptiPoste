@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const ocrRoutes = require('./routes/ocrRoutes');
 
-dotenv.config();
+dotenv.config(); // Ensure this line is present
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, 'uploads');

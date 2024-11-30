@@ -1,9 +1,8 @@
-const vision = require('@google-cloud/vision');
-const Jimp = require('jimp');
+const Tesseract = require('tesseract.js');
+const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 const { parse } = require('json2csv');
-const client = new vision.ImageAnnotatorClient();
 
 const processImage = async (req, res) => {
   try {
@@ -14,7 +13,7 @@ const processImage = async (req, res) => {
     console.log('Processing file:', req.file);
 
     const { path: filePath } = req.file;
-    const image = await Jimp.read(filePath);
+    const image = sharp(filePath);
 
     // Define regions of interest (ROIs)
     const rois = [
@@ -26,11 +25,8 @@ const processImage = async (req, res) => {
     const texts = [];
 
     for (const roi of rois) {
-      const roiImage = image.clone().crop(roi.x, roi.y, roi.width, roi.height);
-      const buffer = await roiImage.getBufferAsync(Jimp.MIME_PNG);
-      const [result] = await client.textDetection(buffer);
-      const detections = result.textAnnotations;
-      const text = detections.length > 0 ? detections[0].description : '';
+      const buffer = await image.extract({ left: roi.x, top: roi.y, width: roi.width, height: roi.height }).toBuffer();
+      const { data: { text } } = await Tesseract.recognize(buffer, 'eng');
       texts.push({ roi, text });
     }
 
