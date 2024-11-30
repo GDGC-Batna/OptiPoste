@@ -2,6 +2,7 @@ const Tesseract = require('tesseract.js');
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 const { upload, deleteFile } = require('../middlewares/upload');
 
 const processImage = async (req, res) => {
@@ -25,7 +26,7 @@ const processImage = async (req, res) => {
       { name: 'naccount', x: 176, y: 252, width: 244, height: 44},
     ];
 
-    const texts = [];
+    const extractedData = {};
 
     for (const roi of rois) {
       // Validate ROI boundaries
@@ -37,12 +38,15 @@ const processImage = async (req, res) => {
       const { data: { text } } = await Tesseract.recognize(buffer, 'eng+ara', {
         tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz' 
       });
-      texts.push({ roi: roi.name, text });
+      extractedData[roi.name] = text.trim();
     }
+
+    // Assign a unique ID to the check
+    extractedData.id = uuidv4();
 
     deleteFile(filePath);
 
-    res.status(200).json({ message: 'Image processed successfully', texts });
+    res.status(200).json({ message: 'Image processed successfully', data: extractedData });
   } catch (error) {
     console.error('Error processing image:', error);
     deleteFile(req.file.path); // Ensure file is deleted in case of error
