@@ -1,11 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const connectDB = require('./config/db');
 const ocrRoutes = require('./routes/ocrRoutes');
 
 dotenv.config();
-connectDB();
+// connectDB(); // Comment out or remove this line
 
 const app = express();
 
