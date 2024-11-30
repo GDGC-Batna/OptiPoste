@@ -1,49 +1,47 @@
 const Tesseract = require('tesseract.js');
-const { PDFDocument } = require('pdf-lib');
 const Jimp = require('jimp');
 const fs = require('fs');
 const path = require('path');
+const { parse } = require('json2csv');
 
 const processImage = async (req, res) => {
   try {
-    const { path: filePath } = req.file;
+    if (!req.file) {
+      throw new Error('File not received');
+    }
 
-    // Read the PDF file
-    const pdfBytes = fs.readFileSync(filePath);
-    const pdfDoc = await PDFDocument.load(pdfBytes);
-    const pages = pdfDoc.getPages();
+    console.log('Processing file:', req.file);
+
+    const { path: filePath } = req.file;
+    const image = await Jimp.read(filePath);
+
+    // Define regions of interest (ROIs)
+    const rois = [
+      { x: 50, y: 50, width: 200, height: 100 }, // Example ROI 1
+      { x: 300, y: 200, width: 200, height: 100 }, // Example ROI 2
+      // Add more ROIs as needed
+    ];
 
     const texts = [];
 
-    for (const page of pages) {
-      const { width, height } = page.getSize();
-      const pageImage = await page.renderToImage({ width, height });
-      const image = await Jimp.read(pageImage);
-
-      // Define regions of interest (ROIs)
-      const rois = [
-        { x: 50, y: 50, width: 200, height: 100 }, // Example ROI 1
-        { x: 300, y: 200, width: 200, height: 100 }, // Example ROI 2
-        // Add more ROIs as needed
-      ];
-
-      for (const roi of rois) {
-        const roiImage = image.clone().crop(roi.x, roi.y, roi.width, roi.height);
-        const buffer = await roiImage.getBufferAsync(Jimp.MIME_PNG);
-        const { data: { text } } = await Tesseract.recognize(buffer, 'eng', {
-          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
-        });
-        texts.push(text);
-      }
+    for (const roi of rois) {
+      const roiImage = image.clone().crop(roi.x, roi.y, roi.width, roi.height);
+      const buffer = await roiImage.getBufferAsync(Jimp.MIME_PNG);
+      const { data: { text } } = await Tesseract.recognize(buffer, 'eng', {
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+      });
+      texts.push({ roi, text });
     }
 
-    // Save the results to a file in the testing folder
-    const resultFilePath = path.join(__dirname, '../testing', `${Date.now()}-result.txt`);
-    fs.writeFileSync(resultFilePath, texts.join('\n'));
+    // Save the results to a CSV file in the Testing folder
+    const csv = parse(texts);
+    const resultFilePath = path.join(__dirname, '../Testing', `${Date.now()}-result.csv`);
+    fs.writeFileSync(resultFilePath, csv);
 
-    res.status(200).json({ message: 'Document processed successfully', texts });
+    res.status(200).json({ message: 'Image processed successfully', texts });
   } catch (error) {
-    res.status(500).json({ message: 'Error processing document', error });
+    console.error('Error processing image:', error);
+    res.status(500).json({ message: 'Error processing image', error: error.message });
   }
 };
 
