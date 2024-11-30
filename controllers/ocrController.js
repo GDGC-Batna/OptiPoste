@@ -2,7 +2,7 @@ const Tesseract = require('tesseract.js');
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
-const { parse } = require('json2csv');
+const { upload, deleteFile } = require('../middlewares/upload');
 
 const processImage = async (req, res) => {
   try {
@@ -14,30 +14,38 @@ const processImage = async (req, res) => {
 
     const { path: filePath } = req.file;
     const image = sharp(filePath);
+    const metadata = await image.metadata();
 
     // Define regions of interest (ROIs)
     const rois = [
-      { x: 50, y: 50, width: 200, height: 100 }, // Example ROI 1
-      { x: 300, y: 200, width: 200, height: 100 }, // Example ROI 2
-      // Add more ROIs as needed
+      { name: 'amount', x: 488, y: 8, width: 169, height: 36},
+      { name: 'recepient', x: 157, y: 84, width: 415, height: 49},
+      { name: 'date', x: 547, y: 121, width: 96, height: 39},
+      { name: 'ncheck', x: 18, y: 263, width: 75, height: 26},
+      { name: 'naccount', x: 176, y: 252, width: 244, height: 44},
     ];
 
     const texts = [];
 
     for (const roi of rois) {
+      // Validate ROI boundaries
+      if (roi.x + roi.width > metadata.width || roi.y + roi.height > metadata.height) {
+        throw new Error(`ROI ${roi.name} is out of image boundaries`);
+      }
+
       const buffer = await image.extract({ left: roi.x, top: roi.y, width: roi.width, height: roi.height }).toBuffer();
-      const { data: { text } } = await Tesseract.recognize(buffer, 'eng');
-      texts.push({ roi, text });
+      const { data: { text } } = await Tesseract.recognize(buffer, 'eng+ara', {
+        tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz' 
+      });
+      texts.push({ roi: roi.name, text });
     }
 
-    // Save the results to a CSV file in the Testing folder
-    const csv = parse(texts);
-    const resultFilePath = path.join(__dirname, '../Testing', `${Date.now()}-result.csv`);
-    fs.writeFileSync(resultFilePath, csv);
+    deleteFile(filePath);
 
     res.status(200).json({ message: 'Image processed successfully', texts });
   } catch (error) {
     console.error('Error processing image:', error);
+    deleteFile(req.file.path); // Ensure file is deleted in case of error
     res.status(500).json({ message: 'Error processing image', error: error.message });
   }
 };
