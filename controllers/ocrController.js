@@ -1,8 +1,9 @@
-const Tesseract = require('tesseract.js');
+const vision = require('@google-cloud/vision');
 const Jimp = require('jimp');
 const fs = require('fs');
 const path = require('path');
 const { parse } = require('json2csv');
+const client = new vision.ImageAnnotatorClient();
 
 const processImage = async (req, res) => {
   try {
@@ -27,9 +28,9 @@ const processImage = async (req, res) => {
     for (const roi of rois) {
       const roiImage = image.clone().crop(roi.x, roi.y, roi.width, roi.height);
       const buffer = await roiImage.getBufferAsync(Jimp.MIME_PNG);
-      const { data: { text } } = await Tesseract.recognize(buffer, 'eng', {
-        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
-      });
+      const [result] = await client.textDetection(buffer);
+      const detections = result.textAnnotations;
+      const text = detections.length > 0 ? detections[0].description : '';
       texts.push({ roi, text });
     }
 
