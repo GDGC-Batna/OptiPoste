@@ -46,7 +46,7 @@ const processImage = async (req, res) => {
 
     deleteFile(filePath);
 
-    res.status(200).json({ message: 'Image processed successfully', data: extractedData });
+    res.status(200).json(extractedData);
   } catch (error) {
     console.error('Error processing image:', error);
     deleteFile(req.file.path); // Ensure file is deleted in case of error
